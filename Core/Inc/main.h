@@ -99,6 +99,7 @@ void Error_Handler(void);
 #define D1_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
+void RkSd_main();
 
 /* USER CODE END Private defines */
 

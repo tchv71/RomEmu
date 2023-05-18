@@ -2,8 +2,8 @@
 // (c) 10-05-2014 vinxru (aleksey.f.morozov@gmail.com)
 
 #include "common.h"
-extern void DATA_BUS_OUT();
-extern void DATA_BUS_IN();
+//extern void DATA_BUS_OUT();
+//extern void DATA_BUS_IN();
 
 
 #define DATA_OUT  DATA_BUS_OUT();

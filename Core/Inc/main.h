@@ -59,6 +59,8 @@ void Error_Handler(void);
 /* Private defines -----------------------------------------------------------*/
 #define LED13_Pin GPIO_PIN_13
 #define LED13_GPIO_Port GPIOC
+#define KEY_Pin GPIO_PIN_0
+#define KEY_GPIO_Port GPIOA
 #define A2_Pin GPIO_PIN_1
 #define A2_GPIO_Port GPIOA
 #define A3_Pin GPIO_PIN_2
@@ -100,6 +102,57 @@ void Error_Handler(void);
 
 /* USER CODE BEGIN Private defines */
 void RkSd_main();
+static inline void DATA_BUS_IN ()
+{
+#if 0
+  GPIO_InitTypeDef GPIO_InitStruct = { 0 };
+  GPIO_InitStruct.Pin = D0_Pin | D1_Pin | D2_Pin | D3_Pin | D4_Pin | D5_Pin | D6_Pin | D7_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init (GPIOB, &GPIO_InitStruct);
+#else
+  uint32_t m = 0b11111111000011110000000000111100;
+  GPIOB->MODER = (GPIOB->MODER & ~m);
+#endif
+}
+
+static inline void DATA_BUS_OUT ()
+{
+#if 0
+  GPIO_InitTypeDef GPIO_InitStruct = { 0 };
+  GPIO_InitStruct.Pin = D0_Pin | D1_Pin | D2_Pin | D3_Pin | D4_Pin | D5_Pin  | D6_Pin | D7_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+  HAL_GPIO_Init (GPIOB, &GPIO_InitStruct);
+#else
+  uint32_t v = 0b01010101000001010000000000010100;
+  uint32_t m = 0b11111111000011110000000000111100;
+  GPIOB->MODER = (GPIOB->MODER & ~m) | v;
+#endif
+}
+
+static inline void WRITE_DATA(uint8_t val)
+{
+  uint32_t portVal = ((val & 0b11110011) << 8) | ((val & 0b1100) >> 1);
+  GPIOB->ODR = portVal;
+}
+
+static inline uint8_t READ_DATA()
+{
+  uint32_t idr = GPIOB->IDR;
+  return ((idr >> 8) & 0b11110011) | ((idr & 0b110) << 1);
+}
+
+static inline uint32_t READ_ADDR()
+{
+  uint32_t pa = GPIOA->IDR;
+  uint32_t pb = GPIOB->IDR;
+  //               D7,D6                D1                D0                        D5-D2
+  //               B7,B6                B0                A7                        A4-A1
+  uint32_t addr = (pb & 0b11000000) | ((pb & 1) << 1) | ((pa & 0b10000000) >> 7) | ((pa & 0b11110) << 1);
+  return addr;
+}
 
 /* USER CODE END Private defines */
 

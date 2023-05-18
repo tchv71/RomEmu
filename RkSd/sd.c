@@ -47,7 +47,7 @@ BYTE sd_sdhc; /* Используется SDHC карта */
 									7 - FCLK/256    */
 #define SD_MAX_SPEED	1 	/* скорость SPI после инициализации карты */
 
-extern 	SPI_HandleTypeDef hspi1;
+extern SPI_HandleTypeDef hspi1;
 #define SPI_SD hspi1.Instance
 
 #if 0
@@ -63,9 +63,10 @@ static BYTE spi_receive() {
 #else
 static BYTE spi_rw(BYTE wval)
 {
-	SPI_SD->DR = wval;
-	while(!(SPI_SD->SR & SPI_SR_RXNE));
-	return SPI_SD->DR;
+  SPI_SD->DR = wval;
+  while (!(SPI_SD->SR & SPI_SR_RXNE))
+    ;
+  return SPI_SD->DR;
 }
 
 #define spi_transmit(dat)		 spi_rw(dat)
@@ -76,13 +77,13 @@ static BYTE spi_rw(BYTE wval)
 //speed от 0 (FCLK/2) до 7 (FCLK/256)
 static void set_sd_interface_speed(uint8_t speed)
 {
-	if (speed > 7) speed = 7;
-	SPI_SD->CR1 &= ~SPI_CR1_SPE; //SPI отключено
-	SPI_SD->CR1 &= ~(0x07UL<<(3U)); //маска бит скорости
-	SPI_SD->CR1 |= (uint32_t)(speed<<(3U));
-	SPI_SD->CR1 |= SPI_CR1_SPE; // SPI enable
+  if (speed > 7)
+    speed = 7;
+  SPI_SD->CR1 &= ~SPI_CR1_SPE; //SPI отключено
+  SPI_SD->CR1 &= ~(0x07UL << (3U)); //маска бит скорости
+  SPI_SD->CR1 |= (uint32_t) (speed << (3U));
+  SPI_SD->CR1 |= SPI_CR1_SPE; // SPI enable
 }
-
 
 /**************************************************************************
  *  Отправка команды                                                       *
@@ -97,75 +98,79 @@ static void set_sd_interface_speed(uint8_t speed)
 #define SD_SEND_OP_COND    (0x40 | 41)
 #define APP_CMD            (0x40 | 55)
 #define READ_OCR           (0x40 | 58)
-enum SD_results {
+enum SD_results
+{
 
-    R1_READY_STATE      = 0x00,
-    R1_IDLE_STATE       = 0x01,
-    R1_ILLEGAL_COMMAND  = 0x04
+  R1_READY_STATE = 0x00, R1_IDLE_STATE = 0x01, R1_ILLEGAL_COMMAND = 0x04
 
 };
-static BYTE sd_sendCommand(BYTE cmd, DWORD arg) {
-	BYTE response, retry;
+static BYTE sd_sendCommand(BYTE cmd, DWORD arg)
+{
+  BYTE response, retry;
 
-	/* Размещение этого кода тут -4 команды, хотя вроде лишние проверки */
-	if (sd_sdhc == 0 && (cmd == READ_SINGLE_BLOCK || cmd == WRITE_SINGLE_BLOCK))
-		arg <<= 9;
+  /* Размещение этого кода тут -4 команды, хотя вроде лишние проверки */
+  if (sd_sdhc == 0 && (cmd == READ_SINGLE_BLOCK || cmd == WRITE_SINGLE_BLOCK))
+    arg <<= 9;
 
-	/* Выбираем карту */
-	SD_CS_ENABLE;
+  /* Выбираем карту */
+  SD_CS_ENABLE;
 
-	/* Заголовок команды */
-	spi_transmit(cmd);
-	spi_transmit(((BYTE*) &arg)[3]);
-	spi_transmit(((BYTE*) &arg)[2]);
-	spi_transmit(((BYTE*) &arg)[1]);
-	spi_transmit(((BYTE*) &arg)[0]);
+  /* Заголовок команды */
+  spi_transmit(cmd);
+  spi_transmit(((BYTE* ) &arg)[3]);
+  spi_transmit(((BYTE* ) &arg)[2]);
+  spi_transmit(((BYTE* ) &arg)[1]);
+  spi_transmit(((BYTE* ) &arg)[0]);
 
-	/* Пару команд требуют CRC. Остальные же команды игнорируют его, поэтому упрощаем код */
-	spi_transmit(cmd == SEND_IF_COND ? 0x87 : 0x95);
+  /* Пару команд требуют CRC. Остальные же команды игнорируют его, поэтому упрощаем код */
+  spi_transmit(cmd == SEND_IF_COND ? 0x87 : 0x95);
 
-	/* Ждем подтвреждение (256 тактов) */
-	retry = 0;
-	while ((response = spi_receive()) & 0x80)
-		if (++retry == 0)
-			break;
+  /* Ждем подтвреждение (256 тактов) */
+  retry = 0;
+  while ((response = spi_receive()) & 0x80)
+    if (++retry == 0)
+      break;
 
-	if (cmd == SEND_IF_COND)
-	{
-		BYTE res = spi_receive();
-		res = spi_receive();
-		res= spi_receive();
-		res =spi_receive();
-	}
-	/* Результат команды READ_OCR обрабатываем тут, так как в конце этой функции мы снимем CS и пропускаем 1 байт */
-	if (response == 0 && cmd == READ_OCR) {
-		/* 32 бита из которых нас интересует один бит */
-		sd_sdhc = spi_receive() & 0x40;
-		spi_receive();
-		spi_receive();
-		spi_receive();
-	}
+  if (cmd == SEND_IF_COND)
+  {
+    spi_receive();
+    spi_receive();
+    spi_receive();
+    spi_receive();
+  }
+  /* Результат команды READ_OCR обрабатываем тут, так как в конце этой функции мы снимем CS и пропускаем 1 байт */
+  if (response == 0 && cmd == READ_OCR)
+  {
+    /* 32 бита из которых нас интересует один бит */
+    sd_sdhc = spi_receive() & 0x40;
+    spi_receive();
+    spi_receive();
+    spi_receive();
+  }
 
-	/* отпускаем CS и пауза в 1 байт*/
-	SD_CS_DISABLE;
-	spi_receive();
+  /* отпускаем CS и пауза в 1 байт*/
+  SD_CS_DISABLE;
+  spi_receive();
 
-	return response;
+  return response;
 }
 
 /**************************************************************************
  *  Проверка готовности/наличия карты                                      *
  **************************************************************************/
 
-BYTE sd_check() {
-	BYTE i = 0;
-	do {
-		BYTE r =sd_sendCommand(APP_CMD, 0);
-		BYTE res = sd_sendCommand(SD_SEND_OP_COND, 0x40000000);
-		if (res == 0)
-			return 0;
-	} while (--i);
-	return 1;
+BYTE sd_check()
+{
+  BYTE i = 0;
+  do
+  {
+    sd_sendCommand (APP_CMD, 0);
+    BYTE res = sd_sendCommand (SD_SEND_OP_COND, 0x40000000);
+    if (res == 0)
+      return 0;
+  }
+  while (--i);
+  return 1;
 }
 
 /**************************************************************************
@@ -174,174 +179,184 @@ BYTE sd_check() {
 
 static BYTE sd_init_int()
 {
-	BYTE i;
-	set_sd_interface_speed(SD_INI_SPEED); //медленное spi
+  BYTE i;
+  set_sd_interface_speed (SD_INI_SPEED); //медленное spi
 
-	/* Сбрасываем SDHC флаг */
-	sd_sdhc = 0;
+  /* Сбрасываем SDHC флаг */
+  sd_sdhc = 0;
 
-	/* Минимум 80 пустых тактов */
-	for (i = 10; i; --i)
-		spi_transmit(0xFF);
+  /* Минимум 80 пустых тактов */
+  for (i = 10; i; --i)
+    spi_transmit(0xFF);
 
-	/* CMD0 Посылаем команду сброса */
-	if (sd_sendCommand(GO_IDLE_STATE, 0) != 1)
-		goto abort;
+  /* CMD0 Посылаем команду сброса */
+  if (sd_sendCommand (GO_IDLE_STATE, 0) != 1)
+    goto abort;
 
-	/* CMD8 Узнаем версию карты */
-	i = 0;
-	BYTE res = sd_sendCommand(SEND_IF_COND, 0x000001AA);
-	if (res)
-		i = 1;
+  /* CMD8 Узнаем версию карты */
+  i = 0;
+  BYTE res = sd_sendCommand (SEND_IF_COND, 0x000001AA);
+  if (res)
+    i = 1;
 
-	/* CMD41 Ожидание окончания инициализации */
-	if (sd_check())
-		goto abort;
+  /* CMD41 Ожидание окончания инициализации */
+  if (sd_check ())
+    goto abort;
 
-	/* Только для второй версии карты */
-	if (i) {
-		/* CMD58 определение SDHC карты. Ответ обрабатывается в функции sd_sendCommand */
-		if (sd_sendCommand(READ_OCR, 0) != 0)
-			goto abort;
-	}
+  /* Только для второй версии карты */
+  if (i)
+  {
+    /* CMD58 определение SDHC карты. Ответ обрабатывается в функции sd_sendCommand */
+    if (sd_sendCommand (READ_OCR, 0) != 0)
+      goto abort;
+  }
 
-	return 0;
-	abort: return 1;
+  return 0;
+abort: return 1;
 }
 
 /**************************************************************************
  *  Инициализация карты                                                    *
  **************************************************************************/
 
-BYTE sd_init() {
-	BYTE tries;
+BYTE sd_init()
+{
+  BYTE tries;
 
-	/* Освобождаем CS на всякий случай */
-	SD_CS_DISABLE;
+  /* Освобождаем CS на всякий случай */
+  SD_CS_DISABLE;
 
-	/* Включаем SPI */
-	SPI_INIT
+  /* Включаем SPI */
+  SPI_INIT
 
-		/* Делаем несколько попыток инициализации */
-	tries = 10;
-	while (sd_init_int())
-		if (--tries == 0) {
-			lastError = ERR_DISK_ERR;
-			return 1;
-		}
+  /* Делаем несколько попыток инициализации */
+  tries = 10;
+  while (sd_init_int ())
+    if (--tries == 0)
+    {
+      lastError = ERR_DISK_ERR;
+      return 1;
+    }
 
-	/* Включаем максимальную скорость */
-	set_sd_interface_speed(SD_MAX_SPEED);
+  /* Включаем максимальную скорость */
+  set_sd_interface_speed (SD_MAX_SPEED);
 
-	return 0;
+  return 0;
 }
 
 /**************************************************************************
  *  Ожидание определенного байта на шине                                   *
  **************************************************************************/
 
-static BYTE sd_waitBus(BYTE byte) {
-	WORD retry = 0;
-	do {
-		if (spi_receive() == byte)
-			return 0;
-	} while (++retry);
-	return 1;
+static BYTE sd_waitBus(BYTE byte)
+{
+  WORD retry = 0;
+  do
+  {
+    if (spi_receive() == byte)
+      return 0;
+  }
+  while (++retry);
+  return 1;
 }
 
 /**************************************************************************
  *  Чтение произвольного участка сектора                                   *
  **************************************************************************/
 
-BYTE sd_read(BYTE *buffer, DWORD sector, WORD offsetInSector, WORD length) {
-	BYTE b;
-	WORD i;
+BYTE sd_read(BYTE *buffer, DWORD sector, WORD offsetInSector, WORD length)
+{
+  BYTE b;
+  WORD i;
 
-	/* Посылаем команду */
-	if (sd_sendCommand(READ_SINGLE_BLOCK, sector))
-		goto abort;
+  /* Посылаем команду */
+  if (sd_sendCommand (READ_SINGLE_BLOCK, sector))
+    goto abort;
 
-	/* Сразу же возращаем CS, что бы принять ответ команды */
-	SD_CS_ENABLE;
+  /* Сразу же возращаем CS, что бы принять ответ команды */
+  SD_CS_ENABLE;
 
-	/* Ждем стартовый байт */
-	if (sd_waitBus(0xFE))
-		goto abort;
+  /* Ждем стартовый байт */
+  if (sd_waitBus (0xFE))
+    goto abort;
 
-	/* Принимаем 512 байт */
-	for (i = 512; i; --i) {
-		b = spi_receive();
-		if (offsetInSector) {
-			offsetInSector--;
-			continue;
-		}
-		if (length == 0)
-			continue;
-		length--;
-		*buffer++ = b;
-	}
+  /* Принимаем 512 байт */
+  for (i = 512; i; --i)
+  {
+    b = spi_receive();
+    if (offsetInSector)
+    {
+      offsetInSector--;
+      continue;
+    }
+    if (length == 0)
+      continue;
+    length--;
+    *buffer++ = b;
+  }
 
-	/* CRC игнорируем */
-	spi_receive();
-	spi_receive();
+  /* CRC игнорируем */
+  spi_receive();
+  spi_receive();
 
-	/* отпускаем CS и пауза в 1 байт*/
-	SD_CS_DISABLE;
-	spi_receive();
+  /* отпускаем CS и пауза в 1 байт*/
+  SD_CS_DISABLE;
+  spi_receive();
 
-	/* Ок */
-	return 0;
+  /* Ок */
+  return 0;
 
-	/* Ошибка и отпускаем CS.*/
-	abort:
-	SD_CS_DISABLE;
-	lastError = ERR_DISK_ERR;
-	return 1;
+  /* Ошибка и отпускаем CS.*/
+abort:
+  SD_CS_DISABLE;
+  lastError = ERR_DISK_ERR;
+  return 1;
 }
 
 /**************************************************************************
  *  Запись сектора (512 байт)                                              *
  **************************************************************************/
 
-BYTE sd_write512(BYTE *buffer, DWORD sector) {
-	WORD n;
+BYTE sd_write512(BYTE *buffer, DWORD sector)
+{
+  WORD n;
 
-	/* Посылаем команду */
-	if (sd_sendCommand(WRITE_SINGLE_BLOCK, sector))
-		goto abort;
+  /* Посылаем команду */
+  if (sd_sendCommand (WRITE_SINGLE_BLOCK, sector))
+    goto abort;
 
-	/* Сразу же возращаем CS, что бы отправить блок данных */
-	SD_CS_ENABLE;
+  /* Сразу же возращаем CS, что бы отправить блок данных */
+  SD_CS_ENABLE;
 
-	/* Посылаем стартовый байт */
-	spi_transmit(0xFE);
+  /* Посылаем стартовый байт */
+  spi_transmit(0xFE);
 
-	/* Данные */
-	for (n = 512; n; --n)
-		spi_transmit(*buffer++);
+  /* Данные */
+  for (n = 512; n; --n)
+    spi_transmit(*buffer++);
 
-	/* CRC игнорируется */
-	spi_transmit(0xFF);
-	spi_transmit(0xFF);
+  /* CRC игнорируется */
+  spi_transmit(0xFF);
+  spi_transmit(0xFF);
 
-	/* Ответ МК */
-	if ((spi_receive() & 0x1F) != 0x05)
-		goto abort;
+  /* Ответ МК */
+  if ((spi_receive() & 0x1F) != 0x05)
+    goto abort;
 
-	/* Ждем окончания записи, т.е. пока не освободится шина */
-	if (sd_waitBus(0xFF))
-		goto abort;
+  /* Ждем окончания записи, т.е. пока не освободится шина */
+  if (sd_waitBus (0xFF))
+    goto abort;
 
-	/* отпускаем CS и пауза в 1 байт*/
-	SD_CS_DISABLE;
-	spi_receive();
+  /* отпускаем CS и пауза в 1 байт*/
+  SD_CS_DISABLE;
+  spi_receive();
 
-	/* Ок */
-	return 0;
+  /* Ок */
+  return 0;
 
-	/* Ошибка.*/
-	abort:
-	SD_CS_DISABLE;
-	lastError = ERR_DISK_ERR;
-	return 1;
+  /* Ошибка.*/
+abort:
+  SD_CS_DISABLE;
+  lastError = ERR_DISK_ERR;
+  return 1;
 }

@@ -533,17 +533,11 @@ void RkSd_main()
     while (1)
     {
       static uint32_t oldAddr = -1;
-      uint32_t pa = GPIOA->IDR;	// & (0b1110));
-      uint32_t pb = GPIOB->IDR;	// & 0b11100011);
-      //               D7,D6                D1                D0                      D5-D2
-      //               B7,B6                B0                A7                      A4-A1
-      uint32_t addr = (pb & 0b11000000) | ((pb & 1) << 1)
-	  | ((pa & 0b10000000) >> 7) | ((pa & 0b11110) << 1);
+      uint32_t addr = READ_ADDR();
       if (oldAddr != addr)
       {
 	uint32_t val = rom[addr & 0x7f];
-	uint32_t portVal = ((val & 0b11110011) << 8) | ((val & 0b1100) >> 1);
-	GPIOB->ODR = portVal;
+	WRITE_DATA(val);
 	oldAddr = addr;
 	if (addr == 0x44)
 	{

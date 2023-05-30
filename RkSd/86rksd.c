@@ -135,7 +135,7 @@ void readInt(char rks)
       {
 	lengthFromFile -= readedLength;
 	if (readLength > lengthFromFile)
-	  lengthFromFile = readedLength;
+	  readLength = lengthFromFile;
       }
     }
 
@@ -186,7 +186,7 @@ void cmd_boot_exec()
     readLength = (WORD) fs_tmp;
 
   // Файлы RK должны быть длиной >4 байт. Мы заносим в readLength = 0 и программа
-  // получает ERR_OK. Но так как она ждем ERR_OK_RKS, это будет ошибкой
+  // получает ERR_OK. Но так как она ждет ERR_OK_RKS, это будет ошибкой
   if (readLength < 4)
     readLength = 0;
 
@@ -609,6 +609,8 @@ void RkSd_main()
 	case 8:
 	  cmd_move ();
 	  break;
+	case 9:
+	  return;
 	default:
 	  lastError = ERR_INVALID_COMMAND;
 	}

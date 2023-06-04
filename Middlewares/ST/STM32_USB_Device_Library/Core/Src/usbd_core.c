@@ -119,7 +119,7 @@ USBD_StatusTypeDef USBD_Init(USBD_HandleTypeDef *pdev,
 #else
   /* Unlink previous class*/
   pdev->pClass[0] = NULL;
-  pdev->pUserData[0] = NULL;
+  //pdev->pUserData[0] = NULL;
 #endif /* USE_USBD_COMPOSITE */
 
   pdev->pConfDesc = NULL;
@@ -178,7 +178,9 @@ USBD_StatusTypeDef USBD_DeInit(USBD_HandleTypeDef *pdev)
     pdev->pClass[0]->DeInit(pdev, (uint8_t)pdev->dev_config);
   }
 
-  pdev->pUserData[0] = NULL;
+  //pdev->pUserData[0] = NULL;
+  pdev->pClassSpecificInterfaceMSC = NULL;
+  pdev->pClassSpecificInterfaceCDC = NULL;
 
 #endif /* USE_USBD_COMPOSITE */
 

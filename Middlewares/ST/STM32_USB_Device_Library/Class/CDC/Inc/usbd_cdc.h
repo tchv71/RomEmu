@@ -114,7 +114,7 @@ typedef struct _USBD_CDC_Itf
 } USBD_CDC_ItfTypeDef;
 
 
-typedef struct
+typedef struct _USBD_CDC_HandleTypeDef
 {
   uint32_t data[CDC_DATA_HS_MAX_PACKET_SIZE / 4U];      /* Force 32-bit alignment */
   uint8_t  CmdOpCode;
@@ -151,18 +151,19 @@ extern USBD_ClassTypeDef USBD_CDC;
 /** @defgroup USB_CORE_Exported_Functions
   * @{
   */
+uint8_t USBD_CDC_Init(USBD_HandleTypeDef *pdev, uint8_t cfgidx);
+uint8_t USBD_CDC_DeInit(USBD_HandleTypeDef *pdev, uint8_t cfgidx);
+uint8_t USBD_CDC_Setup(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *req);
+uint8_t USBD_CDC_DataIn(USBD_HandleTypeDef *pdev, uint8_t epnum);
+uint8_t USBD_CDC_DataOut(USBD_HandleTypeDef *pdev, uint8_t epnum);
+uint8_t USBD_CDC_EP0_RxReady(USBD_HandleTypeDef *pdev);
 uint8_t USBD_CDC_RegisterInterface(USBD_HandleTypeDef *pdev,
                                    USBD_CDC_ItfTypeDef *fops);
-
-uint8_t USBD_CDC_SetTxBuffer(USBD_HandleTypeDef *pdev, uint8_t *pbuff,
-                             uint32_t length);
-
+uint8_t USBD_CDC_SetTxBuffer(USBD_HandleTypeDef *pdev,
+                             uint8_t *pbuff, uint32_t length);
 uint8_t USBD_CDC_SetRxBuffer(USBD_HandleTypeDef *pdev, uint8_t *pbuff);
-uint8_t USBD_CDC_ReceivePacket(USBD_HandleTypeDef *pdev);
 uint8_t USBD_CDC_TransmitPacket(USBD_HandleTypeDef *pdev);
-/**
-  * @}
-  */
+uint8_t USBD_CDC_ReceivePacket(USBD_HandleTypeDef *pdev);
 
 #ifdef __cplusplus
 }

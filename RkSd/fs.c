@@ -139,7 +139,7 @@ BYTE fs_init() {
 #endif
 
   /* Инициализация накопителя */
-  if(sd_init()) return 1;
+  //if(sd_init()) return 1;
   
   /* Ищем файловую систему */
   bsect = 0;               

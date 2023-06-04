@@ -389,8 +389,8 @@ typedef struct _USBD_HandleTypeDef
   USBD_DescriptorsTypeDef *pDesc;
   USBD_ClassTypeDef       *pClass[USBD_MAX_SUPPORTED_CLASS];
   //void                    *pClassData;
-  //void                    *pClassDataCmsit[USBD_MAX_SUPPORTED_CLASS];
-  //void                    *pUserData[USBD_MAX_SUPPORTED_CLASS];
+  void                    *pClassDataCmsit[USBD_MAX_SUPPORTED_CLASS];
+  void                    *pUserData[USBD_MAX_SUPPORTED_CLASS];
   //void                    *pData;
   void                    *pBosDesc;
   void                    *pConfDesc;
@@ -400,9 +400,9 @@ typedef struct _USBD_HandleTypeDef
   USBD_CompositeElementTypeDef tclasslist[USBD_MAX_SUPPORTED_CLASS];
 #endif /* USE_USBD_COMPOSITE */
   USBD_MSC_BOT_HandleTypeDef    *pClassDataMSC;
-  USBD_StorageTypeDef     *pClassSpecificInterfaceMSC;
+  const USBD_StorageTypeDef     *pClassSpecificInterfaceMSC;
   USBD_CDC_HandleTypeDef        *pClassDataCDC;
-  USBD_CDC_ItfTypeDef     *pClassSpecificInterfaceCDC;
+  const USBD_CDC_ItfTypeDef     *pClassSpecificInterfaceCDC;
 
   PCD_HandleTypeDef             *pPCDHandle;
 } USBD_HandleTypeDef;

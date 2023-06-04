@@ -68,9 +68,11 @@ void SdCardSoft ()
 
 }
 
+uint8_t sd_init();
+void error();
 
 /* USER CODE END 0 */
-
+uint8_t bFsReady = 0;
 /**
   * @brief  The application entry point.
   * @retval int
@@ -99,10 +101,10 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  MX_USB_DEVICE_Init();
   MX_SPI1_Init();
   /* USER CODE BEGIN 2 */
-
+  if (sd_init())
+    error ();
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -126,6 +128,8 @@ int main(void)
 
   if (key)
     RkSd_main();
+  MX_USB_DEVICE_Init();
+  bFsReady = 1;
   while (1)
   {
     /* USER CODE END WHILE */

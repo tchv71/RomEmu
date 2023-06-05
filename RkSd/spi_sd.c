@@ -92,7 +92,7 @@ static BYTE sd_sendCommand(BYTE cmd, DWORD arg)
       spi_receive();
       spi_receive();
     }
-    else if (cmd == (SD_CMD_SEND_CSD | 0x40) || cmd == (SD_CMD_SEND_CID | 40))
+    else if (cmd == (SD_CMD_SEND_CSD | 0x40) || cmd == (SD_CMD_SEND_CID | 0x40))
     {
       while ((response = spi_receive()) != SD_START_DATA_SINGLE_BLOCK_READ)
 	if (++retry ==0) break;
@@ -104,6 +104,9 @@ static BYTE sd_sendCommand(BYTE cmd, DWORD arg)
 	  pBuf[i] = spi_receive();
 	}
 	response = 0;
+	spi_receive();
+	spi_receive();
+
       }
     }
     /* Результат команды READ_OCR обрабатываем тут, так как в конце этой функции мы снимем CS и пропускаем 1 байт */
@@ -430,7 +433,7 @@ SD_Error SD_ReadMultiBlocks(uint8_t* pBuffer, uint32_t ReadSector, uint16_t Bloc
   SD_Error rvalue = SD_RESPONSE_FAILURE;
   
   /*!< SD chip select low */
-  SD_CS_LOW();
+  //SD_CS_LOW();
   /*!< Data transfer */
   while (NumberOfBlocks--)
   {
@@ -520,81 +523,164 @@ SD_Error SD_GetCSDRegister(SD_CSD* SD_csd)
 
   /*!< Byte 0 */
   SD_csd->CSDStruct = (CSD_Tab[0] & 0xC0) >> 6;
-  SD_csd->SysSpecVersion = (CSD_Tab[0] & 0x3C) >> 2;
-  SD_csd->Reserved1 = CSD_Tab[0] & 0x03;
+  if (SD_csd->CSDStruct == 0)
+  {
+    SD_csd->SysSpecVersion = (CSD_Tab[0] & 0x3C) >> 2;
+    SD_csd->Reserved1 = CSD_Tab[0] & 0x03;
 
-  /*!< Byte 1 */
-  SD_csd->TAAC = CSD_Tab[1];
+    /*!< Byte 1 */
+    SD_csd->TAAC = CSD_Tab[1];
 
-  /*!< Byte 2 */
-  SD_csd->NSAC = CSD_Tab[2];
+    /*!< Byte 2 */
+    SD_csd->NSAC = CSD_Tab[2];
 
-  /*!< Byte 3 */
-  SD_csd->MaxBusClkFrec = CSD_Tab[3];
+    /*!< Byte 3 */
+    SD_csd->MaxBusClkFrec = CSD_Tab[3];
 
-  /*!< Byte 4 */
-  SD_csd->CardComdClasses = CSD_Tab[4] << 4;
+    /*!< Byte 4 */
+    SD_csd->CardComdClasses = CSD_Tab[4] << 4;
 
-  /*!< Byte 5 */
-  SD_csd->CardComdClasses |= (CSD_Tab[5] & 0xF0) >> 4;
-  SD_csd->RdBlockLen = CSD_Tab[5] & 0x0F;
+    /*!< Byte 5 */
+    SD_csd->CardComdClasses |= (CSD_Tab[5] & 0xF0) >> 4;
+    SD_csd->RdBlockLen = CSD_Tab[5] & 0x0F;
 
-  /*!< Byte 6 */
-  SD_csd->PartBlockRead = (CSD_Tab[6] & 0x80) >> 7;
-  SD_csd->WrBlockMisalign = (CSD_Tab[6] & 0x40) >> 6;
-  SD_csd->RdBlockMisalign = (CSD_Tab[6] & 0x20) >> 5;
-  SD_csd->DSRImpl = (CSD_Tab[6] & 0x10) >> 4;
-  SD_csd->Reserved2 = 0; /*!< Reserved */
+    /*!< Byte 6 */
+    SD_csd->PartBlockRead = (CSD_Tab[6] & 0x80) >> 7;
+    SD_csd->WrBlockMisalign = (CSD_Tab[6] & 0x40) >> 6;
+    SD_csd->RdBlockMisalign = (CSD_Tab[6] & 0x20) >> 5;
+    SD_csd->DSRImpl = (CSD_Tab[6] & 0x10) >> 4;
+    SD_csd->Reserved2 = 0; /*!< Reserved */
 
-  SD_csd->DeviceSize = (CSD_Tab[6] & 0x03) << 10;
+    SD_csd->DeviceSize = (CSD_Tab[6] & 0x03) << 10;
 
-  /*!< Byte 7 */
-  SD_csd->DeviceSize |= (CSD_Tab[7]) << 2;
+    /*!< Byte 7 */
+    SD_csd->DeviceSize |= (CSD_Tab[7]) << 2;
 
-  /*!< Byte 8 */
-  SD_csd->DeviceSize |= (CSD_Tab[8] & 0xC0) >> 6;
+    /*!< Byte 8 */
+    SD_csd->DeviceSize |= (CSD_Tab[8] & 0xC0) >> 6;
 
-  SD_csd->MaxRdCurrentVDDMin = (CSD_Tab[8] & 0x38) >> 3;
-  SD_csd->MaxRdCurrentVDDMax = (CSD_Tab[8] & 0x07);
+    SD_csd->MaxRdCurrentVDDMin = (CSD_Tab[8] & 0x38) >> 3;
+    SD_csd->MaxRdCurrentVDDMax = (CSD_Tab[8] & 0x07);
 
-  /*!< Byte 9 */
-  SD_csd->MaxWrCurrentVDDMin = (CSD_Tab[9] & 0xE0) >> 5;
-  SD_csd->MaxWrCurrentVDDMax = (CSD_Tab[9] & 0x1C) >> 2;
-  SD_csd->DeviceSizeMul = (CSD_Tab[9] & 0x03) << 1;
-  /*!< Byte 10 */
-  SD_csd->DeviceSizeMul |= (CSD_Tab[10] & 0x80) >> 7;
+    /*!< Byte 9 */
+    SD_csd->MaxWrCurrentVDDMin = (CSD_Tab[9] & 0xE0) >> 5;
+    SD_csd->MaxWrCurrentVDDMax = (CSD_Tab[9] & 0x1C) >> 2;
+    SD_csd->DeviceSizeMul = (CSD_Tab[9] & 0x03) << 1;
+    /*!< Byte 10 */
+    SD_csd->DeviceSizeMul |= (CSD_Tab[10] & 0x80) >> 7;
+
+    SD_csd->EraseGrSize = (CSD_Tab[10] & 0x40) >> 6;
+    SD_csd->EraseGrMul = (CSD_Tab[10] & 0x3F) << 1;
+
+    /*!< Byte 11 */
+    SD_csd->EraseGrMul |= (CSD_Tab[11] & 0x80) >> 7;
+    SD_csd->WrProtectGrSize = (CSD_Tab[11] & 0x7F);
+
+    /*!< Byte 12 */
+    SD_csd->WrProtectGrEnable = (CSD_Tab[12] & 0x80) >> 7;
+    SD_csd->ManDeflECC = (CSD_Tab[12] & 0x60) >> 5;
+    SD_csd->WrSpeedFact = (CSD_Tab[12] & 0x1C) >> 2;
+    SD_csd->MaxWrBlockLen = (CSD_Tab[12] & 0x03) << 2;
+
+    /*!< Byte 13 */
+    SD_csd->MaxWrBlockLen |= (CSD_Tab[13] & 0xC0) >> 6;
+    SD_csd->WriteBlockPaPartial = (CSD_Tab[13] & 0x20) >> 5;
+    SD_csd->Reserved3 = 0;
+    SD_csd->ContentProtectAppli = (CSD_Tab[13] & 0x01);
+
+    /*!< Byte 14 */
+    SD_csd->FileFormatGrouop = (CSD_Tab[14] & 0x80) >> 7;
+    SD_csd->CopyFlag = (CSD_Tab[14] & 0x40) >> 6;
+    SD_csd->PermWrProtect = (CSD_Tab[14] & 0x20) >> 5;
+    SD_csd->TempWrProtect = (CSD_Tab[14] & 0x10) >> 4;
+    SD_csd->FileFormat = (CSD_Tab[14] & 0x0C) >> 2;
+    SD_csd->ECC = (CSD_Tab[14] & 0x03);
+
+    /*!< Byte 15 */
+    SD_csd->CSD_CRC = (CSD_Tab[15] & 0xFE) >> 1;
+    SD_csd->Reserved4 = 1;
+  }
+  else if (SD_csd->CSDStruct == 1)
+  {
+    SD_csd->SysSpecVersion = (CSD_Tab[0] & 0x3C) >> 2;
+    SD_csd->Reserved1 = CSD_Tab[0] & 0x03;
+
+    /*!< Byte 1 */
+    SD_csd->TAAC = CSD_Tab[1];
+
+    /*!< Byte 2 */
+    SD_csd->NSAC = CSD_Tab[2];
+
+    /*!< Byte 3 */
+    SD_csd->MaxBusClkFrec = CSD_Tab[3];
+
+    /*!< Byte 4 */
+    SD_csd->CardComdClasses = CSD_Tab[4] << 4;
+
+    /*!< Byte 5 */
+    SD_csd->CardComdClasses |= (CSD_Tab[5] & 0xF0) >> 4;
+    SD_csd->RdBlockLen = CSD_Tab[5] & 0x0F;
+
+    /*!< Byte 6 */
+    SD_csd->PartBlockRead = (CSD_Tab[6] & 0x80) >> 7;
+    SD_csd->WrBlockMisalign = (CSD_Tab[6] & 0x40) >> 6;
+    SD_csd->RdBlockMisalign = (CSD_Tab[6] & 0x20) >> 5;
+    SD_csd->DSRImpl = (CSD_Tab[6] & 0x10) >> 4;
+    SD_csd->Reserved2 = 0; /*!< Reserved */
+
+    SD_csd->DeviceSize = (CSD_Tab[6] & 0xF) << 24;
+
+    /*!< Byte 7 */
+    SD_csd->DeviceSize |= (CSD_Tab[7]) << 16;
+
+    /*!< Byte 8 */
+    SD_csd->DeviceSize |= (CSD_Tab[8]) << 8;
     
-  SD_csd->EraseGrSize = (CSD_Tab[10] & 0x40) >> 6;
-  SD_csd->EraseGrMul = (CSD_Tab[10] & 0x3F) << 1;
+    SD_csd->DeviceSize |= (CSD_Tab[8]);
 
-  /*!< Byte 11 */
-  SD_csd->EraseGrMul |= (CSD_Tab[11] & 0x80) >> 7;
-  SD_csd->WrProtectGrSize = (CSD_Tab[11] & 0x7F);
+    //SD_csd->MaxRdCurrentVDDMin = (CSD_Tab[8] & 0x38) >> 3;
+    //SD_csd->MaxRdCurrentVDDMax = (CSD_Tab[8] & 0x07);
 
-  /*!< Byte 12 */
-  SD_csd->WrProtectGrEnable = (CSD_Tab[12] & 0x80) >> 7;
-  SD_csd->ManDeflECC = (CSD_Tab[12] & 0x60) >> 5;
-  SD_csd->WrSpeedFact = (CSD_Tab[12] & 0x1C) >> 2;
-  SD_csd->MaxWrBlockLen = (CSD_Tab[12] & 0x03) << 2;
+    /*!< Byte 9 */
+    //SD_csd->MaxWrCurrentVDDMin = (CSD_Tab[9] & 0xE0) >> 5;
+    //SD_csd->MaxWrCurrentVDDMax = (CSD_Tab[9] & 0x1C) >> 2;
+    SD_csd->DeviceSizeMul = 17-9;
+    /*!< Byte 10 */
+    //SD_csd->DeviceSizeMul |= (CSD_Tab[10] & 0x80) >> 7;
 
-  /*!< Byte 13 */
-  SD_csd->MaxWrBlockLen |= (CSD_Tab[13] & 0xC0) >> 6;
-  SD_csd->WriteBlockPaPartial = (CSD_Tab[13] & 0x20) >> 5;
-  SD_csd->Reserved3 = 0;
-  SD_csd->ContentProtectAppli = (CSD_Tab[13] & 0x01);
+    SD_csd->EraseGrSize = (CSD_Tab[10] & 0x40) >> 6;
+    SD_csd->EraseGrMul = (CSD_Tab[10] & 0x3F) << 1;
 
-  /*!< Byte 14 */
-  SD_csd->FileFormatGrouop = (CSD_Tab[14] & 0x80) >> 7;
-  SD_csd->CopyFlag = (CSD_Tab[14] & 0x40) >> 6;
-  SD_csd->PermWrProtect = (CSD_Tab[14] & 0x20) >> 5;
-  SD_csd->TempWrProtect = (CSD_Tab[14] & 0x10) >> 4;
-  SD_csd->FileFormat = (CSD_Tab[14] & 0x0C) >> 2;
-  SD_csd->ECC = (CSD_Tab[14] & 0x03);
+    /*!< Byte 11 */
+    SD_csd->EraseGrMul |= (CSD_Tab[11] & 0x80) >> 7;
+    SD_csd->WrProtectGrSize = (CSD_Tab[11] & 0x7F);
 
-  /*!< Byte 15 */
-  SD_csd->CSD_CRC = (CSD_Tab[15] & 0xFE) >> 1;
-  SD_csd->Reserved4 = 1;
- /*!< Return the reponse */
+    /*!< Byte 12 */
+    SD_csd->WrProtectGrEnable = (CSD_Tab[12] & 0x80) >> 7;
+    SD_csd->ManDeflECC = (CSD_Tab[12] & 0x60) >> 5;
+    SD_csd->WrSpeedFact = (CSD_Tab[12] & 0x1C) >> 2;
+    SD_csd->MaxWrBlockLen = (CSD_Tab[12] & 0x03) << 2;
+
+    /*!< Byte 13 */
+    SD_csd->MaxWrBlockLen |= (CSD_Tab[13] & 0xC0) >> 6;
+    SD_csd->WriteBlockPaPartial = (CSD_Tab[13] & 0x20) >> 5;
+    SD_csd->Reserved3 = 0;
+    SD_csd->ContentProtectAppli = (CSD_Tab[13] & 0x01);
+
+    /*!< Byte 14 */
+    SD_csd->FileFormatGrouop = (CSD_Tab[14] & 0x80) >> 7;
+    SD_csd->CopyFlag = (CSD_Tab[14] & 0x40) >> 6;
+    SD_csd->PermWrProtect = (CSD_Tab[14] & 0x20) >> 5;
+    SD_csd->TempWrProtect = (CSD_Tab[14] & 0x10) >> 4;
+    SD_csd->FileFormat = (CSD_Tab[14] & 0x0C) >> 2;
+    SD_csd->ECC = (CSD_Tab[14] & 0x03);
+
+    /*!< Byte 15 */
+    SD_csd->CSD_CRC = (CSD_Tab[15] & 0xFE) >> 1;
+    SD_csd->Reserved4 = 1;
+
+  }
+ /*!< Return the response */
   return rvalue;
 }
 

@@ -201,10 +201,10 @@ int8_t STORAGE_GetCapacity_FS(uint8_t lun, uint32_t *block_num, uint16_t *block_
 
   SD_CardInfo SDCardInfo;
 
-  //SD_GetCardInfo(&SDCardInfo);
+  SD_GetCardInfo(&SDCardInfo);
 
   *block_size = 512;
-  *block_num = 0x4000000;//SDCardInfo.CardCapacity / 512;
+  *block_num = SDCardInfo.CardCapacity;
   return (USBD_OK);
   /* USER CODE END 3 */
 }

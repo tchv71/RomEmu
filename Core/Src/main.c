@@ -126,10 +126,12 @@ int main(void)
   DATA_BUS_IN ();
 #endif
 
-  if (key)
+  uint8_t bRkSd = key != 0;
+  if (bRkSd)
     RkSd_main();
   MX_USB_DEVICE_Init();
-  bFsReady = 1;
+  if (!bRkSd)
+    bFsReady = 1;
   while (1)
   {
     /* USER CODE END WHILE */

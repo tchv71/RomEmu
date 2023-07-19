@@ -44,7 +44,7 @@
  extern "C" {
 #endif
 #include "stm32f4xx_hal.h"
-
+#include "../Core/Inc/main.h"
 /* Includes ------------------------------------------------------------------*/
 //#define SD_SPI                           SPI1
 //#define SD_SPI_CLK                       RCC_APB1Periph_SPI1
@@ -234,13 +234,13 @@ typedef struct
 /** 
   * @brief  Select SD Card: ChipSelect pin low   
   */  
-#define SD_CS_PIN GPIO_PIN_9
-#define SD_CS_GPIO_PORT GPIOA
-#define SD_CS_LOW()     HAL_GPIO_WritePin(SD_CS_GPIO_PORT, SD_CS_PIN, 0)
+//#define SD_CS_PIN GPIO_PIN_9
+//#define SD_CS_GPIO_PORT GPIOA
+#define SD_CS_LOW()     HAL_GPIO_WritePin(SD_CS_GPIO_Port, SD_CS_Pin, 0)
 /** 
   * @brief  Deselect SD Card: ChipSelect pin high   
   */ 
-#define SD_CS_HIGH()    HAL_GPIO_WritePin(SD_CS_GPIO_PORT, SD_CS_PIN, 1)
+#define SD_CS_HIGH()    HAL_GPIO_WritePin(SD_CS_GPIO_Port, SD_CS_Pin, 1)
 /**
   * @}
   */ 

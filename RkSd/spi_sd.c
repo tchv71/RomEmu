@@ -1,4 +1,5 @@
 #include "spi_sd.h"
+#include "sd.h"
 #include "stm32f4xx.h"
 
 typedef unsigned char   BYTE;
@@ -214,54 +215,6 @@ static BYTE sd_waitBus(BYTE byte)
  *  Чтение произвольного участка сектора                                   *
  **************************************************************************/
 
-static BYTE sd_read(BYTE *buffer, DWORD sector, WORD offsetInSector, WORD length)
-{
-  BYTE b;
-  WORD i;
-
-  /* Посылаем команду */
-  if (sd_sendCommand (READ_SINGLE_BLOCK, sector))
-    goto abort;
-
-  /* Сразу же возращаем CS, что бы принять ответ команды */
-  SD_CS_ENABLE;
-
-  /* Ждем стартовый байт */
-  if (sd_waitBus (0xFE))
-    goto abort;
-
-  /* Принимаем 512 байт */
-  for (i = 512; i; --i)
-  {
-    b = spi_receive();
-    if (offsetInSector)
-    {
-      offsetInSector--;
-      continue;
-    }
-    if (length == 0)
-      continue;
-    length--;
-    *buffer++ = b;
-  }
-
-  /* CRC игнорируем */
-  spi_receive();
-  spi_receive();
-
-  /* отпускаем CS и пауза в 1 байт*/
-  SD_CS_DISABLE;
-  spi_receive();
-
-  /* Ок */
-  return 0;
-
-  /* Ошибка и отпускаем CS.*/
-abort:
-  SD_CS_DISABLE;
-  lastError = ERR_DISK_ERR;
-  return 1;
-}
 /**************************************************************************
  *  Запись сектора (512 байт)                                              *
  **************************************************************************/
@@ -467,7 +420,7 @@ SD_Error SD_WriteMultiBlocks(uint8_t* pBuffer, uint32_t WriteSector, uint16_t Bl
   /*!< Data transfer */
   while (NumberOfBlocks--)
   {
-      rvalue = sd_write512(pBuffer, WriteSector);
+      rvalue = sd_write512_Buf(pBuffer, WriteSector);
       if (rvalue)
 	return rvalue;
       pBuffer += BlockSize;

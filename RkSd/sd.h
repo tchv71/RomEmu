@@ -15,10 +15,12 @@ Version 0.99 5-05-2013
 
 #ifndef _SD_H_
 #define _SD_H_
+#include "common.h"
 
-BYTE sd_init(); /* Инициализация карты */
-BYTE sd_check(); /* Проверка наличия карты */
-BYTE sd_read(BYTE* buffer, DWORD sector, WORD offsetInSector, WORD length); /* Чтение части сектора */
-BYTE sd_write512(BYTE* buffer, DWORD sector); /* Запись сектора */
+BYTE sd_init(); /* пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ */
+BYTE sd_check(); /* пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ */
+BYTE sd_read(BYTE* buffer, DWORD sector, WORD offsetInSector, WORD length); /* пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ */
+BYTE sd_write512(BYTE* buffer, DWORD sector); /* пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ */
+BYTE sd_write512_Buf(BYTE *buffer, DWORD sector);
 
 #endif

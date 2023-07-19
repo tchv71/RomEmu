@@ -26,8 +26,8 @@ BYTE sd_sdhc; /* Используется SDHC карта */
  **************************************************************************/
 
 /* Куда подключена линия CS карты */
-#define SD_CS_ENABLE    HAL_GPIO_WritePin(RXRDY_GPIO_Port, RXRDY_Pin, 0) //GPIO_RX PORTB &= ~0x04;
-#define SD_CS_DISABLE   HAL_GPIO_WritePin(RXRDY_GPIO_Port, RXRDY_Pin, 1) //PORTB |= 0x04;
+#define SD_CS_ENABLE    HAL_GPIO_WritePin(SD_CS_GPIO_Port, SD_CS_Pin, 0) //GPIO_RX PORTB &= ~0x04;
+#define SD_CS_DISABLE   HAL_GPIO_WritePin(SD_CS_GPIO_Port, SD_CS_Pin, 1) //PORTB |= 0x04;
 
 /* Совместимость с разными версиями CodeVisionAVR */
 #ifndef SPI2X
@@ -312,7 +312,47 @@ abort:
   lastError = ERR_DISK_ERR;
   return 1;
 }
+#include <string.h>
 
+static const BYTE WB_size = 64;
+
+struct WB_Rec
+{
+  ;BYTE bWrite;
+  DWORD dwSector;
+  BYTE buf[512];
+};
+struct WB_Rec WB_RecBuf[64];
+
+volatile BYTE WB_start=0;
+volatile BYTE WB_end=0;
+
+void InitWB_Ring()
+{
+  WB_start = WB_end = 0;
+}
+
+uint8_t rb_write_rec()
+{
+  if (WB_start == WB_end)
+    return 0; // Nothing to write
+  sd_write512(WB_RecBuf[WB_start].buf, WB_RecBuf[WB_start].dwSector);
+  WB_start = (WB_start+1)%WB_size;
+  return 1;
+}
+
+BYTE sd_write512_Buf(BYTE *buffer, DWORD sector)
+{
+  if ((WB_end+1)%WB_size == WB_start)
+  {
+    // No more space in ring buffer - write pending record and add current to end
+    rb_write_rec();
+  }
+  memcpy(WB_RecBuf[WB_end].buf, buffer, 512);
+  WB_RecBuf[WB_end].dwSector = sector;
+  WB_end = (WB_end+1)%WB_size;
+  return 0;
+}
 /**************************************************************************
  *  Запись сектора (512 байт)                                              *
  **************************************************************************/

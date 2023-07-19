@@ -172,7 +172,7 @@ void cmd_boot_exec()
 {
   // Файл по умолчанию
   if (buf[0] == 0)
-    strcpy ((char*) buf, (const char*) "boot/sdbios.rk");
+    strcpy ((char*) buf, (const char*) (nCS_GPIO_Port->IDR & nCS_Pin)? "boota/sdbios.rk" : "boot/sdbios.rk");
 
   // Открываем файл
   if (fs_open ())
@@ -205,6 +205,8 @@ void cmd_exec()
   // Прием имени файла
   recvString ();
 
+  if ((nCS_GPIO_Port->IDR & nCS_Pin) && stricmp(buf, "BOOT/SHELL.RK") == 0)
+    strcpy(buf, "BOOTA/SHELL.RK");
   // Режим передачи и подтверждение
   sendStart (ERR_WAIT);
   if (lastError)
@@ -492,9 +494,83 @@ void LedOn()
   HAL_GPIO_WritePin (LED13_GPIO_Port, LED13_Pin, 0);
 }
 
-void RkSd_main()
+BYTE RkSd_Loop()
 {
   BYTE c;
+  //while (1)
+  {
+    // Зажигаем светодиод
+    LedOn ();
+
+    // Проверяем наличие карты
+    sendStart (ERR_START);
+    send (ERR_WAIT);
+    if (fs_check ())
+    {
+      send (ERR_DISK_ERR);
+    }
+    else
+    {
+      send (ERR_OK_DISK);
+      recvStart ();
+      c = wrecv ();
+
+      // Сбрасываем ошибку
+      lastError = 0;
+
+      // Принимаем аргументы
+      switch (c)
+	{
+	case 0:
+	  cmd_boot ();
+	  break;
+	case 1:
+	  cmd_ver ();
+	  break;
+	case 2:
+	  cmd_exec ();
+	  break;
+	case 3:
+	  cmd_find ();
+	  break;
+	case 4:
+	  cmd_open ();
+	  break;
+	case 5:
+	  cmd_lseek ();
+	  break;
+	case 6:
+	  cmd_read ();
+	  break;
+	case 7:
+	  cmd_write ();
+	  break;
+	case 8:
+	  cmd_move ();
+	  break;
+	case 9:
+	  return 0;
+	default:
+	  lastError = ERR_INVALID_COMMAND;
+	}
+
+      // Вывод ошибки
+      if (lastError)
+	sendStart (lastError);
+    }
+
+    // Порт рабоатет на выход
+    wait ();
+    DATA_OUT
+
+    // Гасим светодиод
+    LedOff ();
+    return 1;
+  }
+}
+
+void RkSd_main()
+{
 
   DATA_OUT
   // Шина данных (DDRD)
@@ -508,7 +584,10 @@ void RkSd_main()
   // Запуск файловой системы
   if (fs_init ())
     error ();
-  strcpy ((char*) buf, "boot/boot.rk");
+  if(nCS_GPIO_Port->IDR & nCS_Pin)
+    strcpy ((char*) buf, "boota/boot.rk");
+  else
+    strcpy ((char*) buf, "boot/boot.rk");
   if (fs_open ())
     error ();
   if (fs_getfilesize ())
@@ -560,71 +639,7 @@ void RkSd_main()
       }
 
     }
-    // Зажигаем светодиод
-    LedOn ();
-
-    // Проверяем наличие карты
-    sendStart (ERR_START);
-    send (ERR_WAIT);
-    if (fs_check ())
-    {
-      send (ERR_DISK_ERR);
-    }
-    else
-    {
-      send (ERR_OK_DISK);
-      recvStart ();
-      c = wrecv ();
-
-      // Сбрасываем ошибку
-      lastError = 0;
-
-      // Принимаем аргументы
-      switch (c)
-	{
-	case 0:
-	  cmd_boot ();
-	  break;
-	case 1:
-	  cmd_ver ();
-	  break;
-	case 2:
-	  cmd_exec ();
-	  break;
-	case 3:
-	  cmd_find ();
-	  break;
-	case 4:
-	  cmd_open ();
-	  break;
-	case 5:
-	  cmd_lseek ();
-	  break;
-	case 6:
-	  cmd_read ();
-	  break;
-	case 7:
-	  cmd_write ();
-	  break;
-	case 8:
-	  cmd_move ();
-	  break;
-	case 9:
-	  return;
-	default:
-	  lastError = ERR_INVALID_COMMAND;
-	}
-
-      // Вывод ошибки
-      if (lastError)
-	sendStart (lastError);
-    }
-
-    // Порт рабоатет на выход
-    wait ();
-    DATA_OUT
-
-    // Гасим светодиод
-    LedOff ();
+    if (!RkSd_Loop())
+      return;
   }
 }

@@ -130,15 +130,52 @@ int main(void)
   if (bRkSd)
     RkSd_main();
   MX_USB_DEVICE_Init();
+  void InitWB_Ring();
   if (!bRkSd)
+  {
     bFsReady = 1;
+    InitWB_Ring();
+  }
+
   while (1)
   {
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
 #if !ROM_EMULATION
+    //void RkSd_Loop();
+    #if 0
+      uint32_t lastAddr = 0;
+
+      static uint32_t oldAddr = -1;
+      uint32_t addr = READ_ADDR ();
+      if (oldAddr != addr)
+      {
+	oldAddr = addr;
+	if (addr == 0x44)
+	{
+	  lastAddr = 0x44;
+	}
+	else if (addr == 0x40)
+	{
+	  if (lastAddr == 0x44)
+	    lastAddr = 0x40;
+	  else
+	    lastAddr = 0;
+	}
+	else if (addr == 0)
+	{
+	  if (lastAddr == 0x40)
+	    //RkSd_main();
+	    RkSd_Loop();
+	  else
+	    lastAddr = 0;
+	}
+      }
+    #endif
     // if nCS is high - release the bus
+    void rb_write_rec();
+    rb_write_rec();
     if (nCS_GPIO_Port->IDR & nCS_Pin)
     {
       if (!bFrom_nCS)
@@ -317,7 +354,7 @@ static void MX_GPIO_Init(void)
                           |D6_Pin|D7_Pin|D0_Pin|D1_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, RXRDY_Pin|TXRDY_Pin, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(GPIOA, SD_CS_Pin|RXRDY_Pin|TXRDY_Pin, GPIO_PIN_SET);
 
   /*Configure GPIO pin : LED13_Pin */
   GPIO_InitStruct.Pin = LED13_Pin;
@@ -360,6 +397,13 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_PULLUP;
   HAL_GPIO_Init(nCS_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : SD_CS_Pin */
+  GPIO_InitStruct.Pin = SD_CS_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+  HAL_GPIO_Init(SD_CS_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pins : RXRDY_Pin TXRDY_Pin */
   GPIO_InitStruct.Pin = RXRDY_Pin|TXRDY_Pin;

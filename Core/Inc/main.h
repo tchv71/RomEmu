@@ -87,6 +87,8 @@ void Error_Handler(void);
 #define D6_GPIO_Port GPIOB
 #define D7_Pin GPIO_PIN_15
 #define D7_GPIO_Port GPIOB
+#define SD_CS_Pin GPIO_PIN_8
+#define SD_CS_GPIO_Port GPIOA
 #define RXRDY_Pin GPIO_PIN_9
 #define RXRDY_GPIO_Port GPIOA
 #define TXRDY_Pin GPIO_PIN_10

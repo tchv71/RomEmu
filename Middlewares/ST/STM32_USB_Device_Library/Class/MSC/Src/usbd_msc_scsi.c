@@ -631,6 +631,8 @@ static int8_t SCSI_StartStopUnit(USBD_HandleTypeDef *pdev, uint8_t lun, uint8_t 
   }
   else if ((params[4] & 0x3U) == 0x2U) /* START=0 and LOEJ Load Eject=1 */
   {
+    uint8_t rb_write_rec();
+    while (rb_write_rec()) ;
     hmsc->scsi_medium_state = SCSI_MEDIUM_EJECTED;
   }
   else if ((params[4] & 0x3U) == 0x3U) /* START=1 and LOEJ Load Eject=1 */

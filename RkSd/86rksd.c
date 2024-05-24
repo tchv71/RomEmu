@@ -11,6 +11,7 @@
 #include "fs.h"
 #include "proto.h"
 #include "../Core/Inc/main.h"
+#include "stm32f4xx_hal_rtc.h"
 
 #ifndef X86_DEBUG
 //#include <delay.h>
@@ -30,6 +31,7 @@
 #define ERR_OK_ENTRY        0x45
 #define ERR_OK_WRITE        0x46
 #define ERR_OK_RKS          0x47
+#define ERR_DATETIME        0x50
 #define ERR_READ_BLOCK      0x4F
 
 BYTE buf[512];
@@ -401,6 +403,110 @@ void cmd_lseek()
 }
 
 /*******************************************************************************
+ * Получить дату                                                                *
+ *******************************************************************************/
+extern RTC_HandleTypeDef hrtc;
+void cmd_get_date()
+{
+  sendStart(ERR_WAIT);
+  RTC_DateTypeDef sDate={0};
+  if (HAL_RTC_GetDate(&hrtc, &sDate, RTC_FORMAT_BIN)!= HAL_OK)
+  {
+    lastError = ERR_DATETIME;
+    return;
+  }
+  sendBin((BYTE*)&sDate, sizeof(sDate));
+  send (ERR_OK_CMD);
+  //lastError = ERR_OK_CMD;
+}
+
+static const uint8_t list_mth[12] = {0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4};
+
+uint8_t Calendar_GetDayWeek (RTC_DateTypeDef thisDate){
+	uint8_t ret = 0;
+    if(thisDate.Month < 3){
+    	thisDate.Year -= 1;
+    }
+    ret = (uint8_t)((thisDate.Year + (thisDate.Year/4) - (thisDate.Year/100) + (thisDate.Year/400) + list_mth[thisDate.Month-1] + thisDate.Date) % 7);
+	return (ret);
+}
+/*******************************************************************************
+ * Установить дату                                                              *
+ *******************************************************************************/
+void cmd_set_date()
+{
+  RTC_DateTypeDef sDate={0};
+  //recvStart();
+  sDate.WeekDay = wrecv();
+  sDate.Month = wrecv();
+  sDate.Date = wrecv();
+  sDate.Year = wrecv();
+  sDate.WeekDay = Calendar_GetDayWeek(sDate);
+  // Режим передачи и подтверждение
+  sendStart (ERR_WAIT);
+
+  if (HAL_RTC_SetDate(&hrtc, &sDate, RTC_FORMAT_BIN)!= HAL_OK)
+  {
+    lastError = ERR_DATETIME;
+    return;
+  }
+  send (ERR_OK_CMD);
+  //lastError = ERR_OK_CMD;
+}
+
+/*******************************************************************************
+ * Получить время                                                               *
+ *******************************************************************************/
+void cmd_get_time()
+{
+  sendStart(ERR_WAIT);
+  RTC_TimeTypeDef sTime={0};
+
+  if (HAL_RTC_GetTime(&hrtc, &sTime, RTC_FORMAT_BIN)!= HAL_OK)
+  {
+    lastError = ERR_DATETIME;
+    return;
+  }
+  RTC_DateTypeDef sDate={0};
+  if (HAL_RTC_GetDate(&hrtc, &sDate, RTC_FORMAT_BIN)!= HAL_OK)
+  {
+    lastError = ERR_DATETIME;
+    return;
+  }
+  sendBin((BYTE*)&sTime, 3);
+  sendBin((BYTE*)&sTime.SecondFraction,1);
+  sendBin((BYTE*)&sTime.SubSeconds,1);
+  send (ERR_OK_CMD);
+  lastError = ERR_OK_CMD;
+}
+
+/*******************************************************************************
+ * Установить время                                                               *
+ *******************************************************************************/
+void cmd_set_time()
+{
+  RTC_TimeTypeDef sTime={0};
+  sTime.Hours = wrecv();
+  sTime.Minutes = wrecv();
+  sTime.Seconds = wrecv();
+  sTime.SecondFraction = wrecv();
+  sTime.SubSeconds = wrecv();
+  if (sTime.SecondFraction != 255)
+  {
+    sTime.SubSeconds = sTime.SubSeconds * sTime.SecondFraction / 256;
+  }
+  sTime.DayLightSaving = RTC_DAYLIGHTSAVING_NONE;
+  sTime.StoreOperation = RTC_STOREOPERATION_RESET;
+  if (HAL_RTC_SetTime(&hrtc, &sTime, RTC_FORMAT_BIN)!= HAL_OK)
+  {
+    lastError = ERR_DATETIME;
+    return;
+  }
+  send (ERR_OK_CMD);
+  lastError = ERR_OK_CMD;
+}
+
+/*******************************************************************************
  * Прочитать из файла                                                           *
  *******************************************************************************/
 
@@ -505,11 +611,11 @@ BYTE RkSd_Loop()
     // Проверяем наличие карты
     sendStart (ERR_START);
     send (ERR_WAIT);
-    if (fs_check ())
-    {
-      send (ERR_DISK_ERR);
-    }
-    else
+    //if (fs_check ())
+    //{
+    //  send (ERR_DISK_ERR);
+    //}
+    //else
     {
       send (ERR_OK_DISK);
       recvStart ();
@@ -549,7 +655,20 @@ BYTE RkSd_Loop()
 	  cmd_move ();
 	  break;
 	case 9:
+	  LedOff ();
 	  return 0;
+	case 0x2A:
+	  cmd_get_date();
+	  break;
+	case 0x2B:
+	  cmd_set_date();
+	  break;
+	case 0x2C:
+	  cmd_get_time();
+	  break;
+	case 0x2D:
+	  cmd_set_time();
+	  break;
 	default:
 	  lastError = ERR_INVALID_COMMAND;
 	}
@@ -559,7 +678,7 @@ BYTE RkSd_Loop()
 	sendStart (lastError);
     }
 
-    // Порт рабоатет на выход
+    // Порт работает на выход
     wait ();
     DATA_OUT
 
@@ -579,7 +698,7 @@ void RkSd_main()
   //PORTB = 0b00010001; // Подтягивающий резистор на MISO и светодиод
 
   // Пауза, пока не стабилизируется питание
-  HAL_Delay (100);
+  HAL_Delay (500);
 
   // Запуск файловой системы
   if (fs_init ())

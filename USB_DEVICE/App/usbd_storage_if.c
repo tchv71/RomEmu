@@ -208,7 +208,7 @@ int8_t STORAGE_GetCapacity_FS(uint8_t lun, uint32_t *block_num, uint16_t *block_
   return (USBD_OK);
   /* USER CODE END 3 */
 }
-extern uint8_t bFsReady;
+
 /**
   * @brief   Checks whether the medium is ready.
   * @param  lun:  Logical unit number.
@@ -217,6 +217,7 @@ extern uint8_t bFsReady;
 int8_t STORAGE_IsReady_FS(uint8_t lun)
 {
   /* USER CODE BEGIN 4 */
+  extern uint8_t bFsReady;
   UNUSED(lun);
   return bFsReady ? USBD_OK : USBD_FAIL;
   /* USER CODE END 4 */

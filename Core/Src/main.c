@@ -42,6 +42,8 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+RTC_HandleTypeDef hrtc;
+
 SPI_HandleTypeDef hspi1;
 
 /* USER CODE BEGIN PV */
@@ -57,6 +59,7 @@ extern USBD_HandleTypeDef hUsbDeviceFS;
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_SPI1_Init(void);
+static void MX_RTC_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -71,14 +74,16 @@ void SdCardSoft ()
 uint8_t sd_init();
 void error();
 
-/* USER CODE END 0 */
 uint8_t bFsReady = 0;
+/* USER CODE END 0 */
+
 /**
   * @brief  The application entry point.
   * @retval int
   */
 int main(void)
 {
+
   /* USER CODE BEGIN 1 */
 
   /* USER CODE END 1 */
@@ -101,7 +106,9 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_USB_DEVICE_Init();
   MX_SPI1_Init();
+  MX_RTC_Init();
   /* USER CODE BEGIN 2 */
   if (sd_init())
     error ();
@@ -143,36 +150,72 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 #if !ROM_EMULATION
-    //void RkSd_Loop();
-    #if 0
-      uint32_t lastAddr = 0;
+#if 1
+    uint8_t RkSd_Loop();
+    static uint32_t addr = 0;
+    //while (1)
+    {
+      static uint32_t lastAddr = 0;
 
       static uint32_t oldAddr = -1;
-      uint32_t addr = READ_ADDR ();
-      if (oldAddr != addr)
+      //DATA_BUS_OUT();
+      addr = READ_ADDR ();
+      if (addr == 0x7E/* && oldAddr != addr*/)
       {
-	oldAddr = addr;
-	if (addr == 0x44)
+check_addr:
+	DATA_BUS_OUT ();
+	oldAddr = 0;
+	while (1)
 	{
-	  lastAddr = 0x44;
-	}
-	else if (addr == 0x40)
-	{
-	  if (lastAddr == 0x44)
-	    lastAddr = 0x40;
-	  else
-	    lastAddr = 0;
-	}
-	else if (addr == 0)
-	{
-	  if (lastAddr == 0x40)
-	    //RkSd_main();
-	    RkSd_Loop();
-	  else
-	    lastAddr = 0;
+	  addr = READ_ADDR ();
+	  if (oldAddr == addr)
+	    continue;
+	  oldAddr = addr;
+	  if (addr == 0x7F)
+	  {
+	    WRITE_DATA (0xAA);
+	    lastAddr = addr;
+	  }
+	  else if (addr == 0x7E)
+	  {
+	    WRITE_DATA (0x55);
+	  }
+	  else if (addr == 0x44)
+	  {
+	    lastAddr = 0x44;
+	  }
+	  else if (addr == 0x40)
+	  {
+	    if (lastAddr == 0x44)
+	      lastAddr = 0x40;
+	    else
+	    {
+	      lastAddr = 0;
+	      break;
+	    }
+	  }
+	  else if (addr == 0)
+	  {
+	    if (lastAddr == 0x40)
+	    {
+	      //RkSd_main();
+	      //MX_USB_DEVICE_Deinit ();
+	      while (RkSd_Loop ())
+		;
+	      MX_USB_DEVICE_Init ();
+	      break;
+	    }
+	    else if (lastAddr != 0x7F)
+	    {
+	      lastAddr = 0;
+	      break;
+	    }
+	  }
 	}
       }
-    #endif
+      DATA_BUS_IN ();
+    }
+#endif
     // if nCS is high - release the bus
     void rb_write_rec();
     rb_write_rec();
@@ -197,6 +240,15 @@ int main(void)
       bFrom_nCS = 0;
     }
     HAL_GPIO_WritePin (RXRDY_GPIO_Port, RXRDY_Pin | TXRDY_Pin, 1);
+    if ((CLIENT_RTS_PORT->IDR & CLIENT_RTS) != 0 && (CLIENT_RTR_PORT->IDR & CLIENT_RTR) != 0)
+    {
+      //MX_USB_DEVICE_Deinit ();
+      //RkSd_main();
+      while (RkSd_Loop ())
+	;
+      MX_USB_DEVICE_Init();
+      continue;
+    }
     if ((CLIENT_RTS_PORT->IDR & CLIENT_RTS) != 0)
     {
       // Receive a byte from client
@@ -206,9 +258,15 @@ int main(void)
       TxBuf[0] = READ_DATA ();
       HAL_GPIO_WritePin (TXRDY_GPIO_Port, TXRDY_Pin, 1);
       uint8_t res = 0;
+      //uint8_t nTry = 10;
       do
+      {
 	res = CDC_Transmit_FS (TxBuf, 1);
-      while (res != USBD_OK);
+	addr = READ_ADDR ();
+	if (addr == 0x7E)
+	  goto check_addr;
+      }
+      while ((res != USBD_OK)/* && (--nTry != 0)*/);
     }
     else if ((CLIENT_RTR_PORT->IDR & CLIENT_RTR) != 0 && ComBufferLength != 0)
     {
@@ -263,8 +321,9 @@ void SystemClock_Config(void)
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_LSI|RCC_OSCILLATORTYPE_HSE;
   RCC_OscInitStruct.HSEState = RCC_HSE_ON;
+  RCC_OscInitStruct.LSIState = RCC_LSI_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
   RCC_OscInitStruct.PLL.PLLM = 25;
@@ -289,6 +348,69 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
+}
+
+/**
+  * @brief RTC Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_RTC_Init(void)
+{
+
+  /* USER CODE BEGIN RTC_Init 0 */
+
+  /* USER CODE END RTC_Init 0 */
+
+  //RTC_TimeTypeDef sTime = {0};
+  //RTC_DateTypeDef sDate = {0};
+
+  /* USER CODE BEGIN RTC_Init 1 */
+
+  /* USER CODE END RTC_Init 1 */
+
+  /** Initialize RTC Only
+  */
+  hrtc.Instance = RTC;
+  hrtc.Init.HourFormat = RTC_HOURFORMAT_24;
+  hrtc.Init.AsynchPrediv = 127;
+  hrtc.Init.SynchPrediv = 255;
+  hrtc.Init.OutPut = RTC_OUTPUT_DISABLE;
+  hrtc.Init.OutPutPolarity = RTC_OUTPUT_POLARITY_HIGH;
+  hrtc.Init.OutPutType = RTC_OUTPUT_TYPE_OPENDRAIN;
+  if (HAL_RTC_Init(&hrtc) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /* USER CODE BEGIN Check_RTC_BKUP */
+
+  /* USER CODE END Check_RTC_BKUP */
+
+  /** Initialize RTC and set the Time and Date
+  sTime.Hours = 0x0;
+  sTime.Minutes = 0x0;
+  sTime.Seconds = 0x0;
+  sTime.DayLightSaving = RTC_DAYLIGHTSAVING_NONE;
+  sTime.StoreOperation = RTC_STOREOPERATION_RESET;
+  if (HAL_RTC_SetTime(&hrtc, &sTime, RTC_FORMAT_BCD) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sDate.WeekDay = RTC_WEEKDAY_MONDAY;
+  sDate.Month = RTC_MONTH_JANUARY;
+  sDate.Date = 0x1;
+  sDate.Year = 0x0;
+
+  if (HAL_RTC_SetDate(&hrtc, &sDate, RTC_FORMAT_BCD) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  */
+  /* USER CODE BEGIN RTC_Init 2 */
+
+  /* USER CODE END RTC_Init 2 */
+
 }
 
 /**

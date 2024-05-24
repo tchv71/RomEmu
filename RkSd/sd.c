@@ -314,7 +314,7 @@ abort:
 }
 #include <string.h>
 
-static const BYTE WB_size = 64;
+#define WB_size 64
 
 struct WB_Rec
 {
@@ -322,7 +322,7 @@ struct WB_Rec
   DWORD dwSector;
   BYTE buf[512];
 };
-struct WB_Rec WB_RecBuf[64];
+struct WB_Rec WB_RecBuf[WB_size];
 
 volatile BYTE WB_start=0;
 volatile BYTE WB_end=0;

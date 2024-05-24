@@ -21,15 +21,17 @@ static BYTE spi_rw(BYTE wval)
 
 //скорость интерфейса SPI
 //speed от 0 (FCLK/2) до 7 (FCLK/256)
-static void set_sd_interface_speed(uint8_t speed)
-{
-  if (speed > 7)
-    speed = 7;
-  SPI_SD->CR1 &= ~SPI_CR1_SPE; //SPI отключено
-  SPI_SD->CR1 &= ~(0x07UL << (3U)); //маска бит скорости
-  SPI_SD->CR1 |= (uint32_t) (speed << (3U));
-  SPI_SD->CR1 |= SPI_CR1_SPE; // SPI enable
-}
+#if 0
+  static void set_sd_interface_speed(uint8_t speed)
+  {
+    if (speed > 7)
+      speed = 7;
+    SPI_SD->CR1 &= ~SPI_CR1_SPE; //SPI отключено
+    SPI_SD->CR1 &= ~(0x07UL << (3U)); //маска бит скорости
+    SPI_SD->CR1 |= (uint32_t) (speed << (3U));
+    SPI_SD->CR1 |= SPI_CR1_SPE; // SPI enable
+  }
+#endif
 
 #define SD_INI_SPEED	6 	/* скорость SPI при инициализации карты:
 									0 - FCLK/2,
@@ -132,7 +134,7 @@ static BYTE sd_sendCommand(BYTE cmd, DWORD arg)
 
 BYTE sd_check();
 
-
+#if 0
 static BYTE sd_init_int()
 {
   BYTE i;
@@ -171,6 +173,7 @@ static BYTE sd_init_int()
   return 0;
 abort: return 1;
 }
+#endif
 
 void SD_LowLevel_DeInit()
 {
@@ -195,17 +198,19 @@ BYTE sd_init();
  *  Ожидание определенного байта на шине                                   *
  **************************************************************************/
 
-static BYTE sd_waitBus(BYTE byte)
-{
-  WORD retry = 0;
-  do
+#if 0
+  static BYTE sd_waitBus(BYTE byte)
   {
-    if (spi_receive() == byte)
-      return 0;
+    WORD retry = 0;
+    do
+    {
+      if (spi_receive() == byte)
+	return 0;
+    }
+    while (++retry);
+    return 1;
   }
-  while (++retry);
-  return 1;
-}
+#endif
 
 #define SD_CS_ENABLE SD_CS_LOW()
 #define SD_CS_DISABLE SD_CS_HIGH()

@@ -623,8 +623,6 @@ BYTE RkSd_Loop()
   BYTE c;
   //while (1)
   {
-    // Зажигаем светодиод
-    LedOn ();
 
     // Проверяем наличие карты
     sendStart (STA_START);
@@ -638,6 +636,8 @@ BYTE RkSd_Loop()
       send (STA_OK_DISK);
       recvStart ();
       c = wrecv ();
+      // Зажигаем светодиод
+      LedOn ();
 
       // Сбрасываем ошибку
       lastError = 0;
@@ -697,6 +697,7 @@ BYTE RkSd_Loop()
       #ifdef USE_DMA
 	sendFlush();
       #endif
+      LedOff();
     }
 
     #ifndef USE_DMA
@@ -718,7 +719,6 @@ BYTE dma_send(const BYTE* ptr, WORD len)
 {
   DATA_IN();
   DRQ_Port->ODR = DRQ_Port->ODR | DRQ_Pin; //DRQ = 1;
-  LedOn();//LED = 1;
   WORD count = len;
   __disable_irq();
   do
@@ -731,7 +731,6 @@ BYTE dma_send(const BYTE* ptr, WORD len)
   } while (--count);
   DRQ_Port->ODR = DRQ_Port->ODR & ~DRQ_Pin; //DRQ = 0;
   __enable_irq();
-  LedOff(); //LED = 0;
   return 0;
 }
 
@@ -739,7 +738,6 @@ BYTE dma_receive(BYTE* ptr, WORD len)
 {
   DATA_IN();
   DRQ_Port->ODR = DRQ_Port->ODR | DRQ_Pin; //DRQ = 1;
-  LedOn();//LED = 1;
   __disable_irq();
   do
   {
@@ -749,7 +747,6 @@ BYTE dma_receive(BYTE* ptr, WORD len)
   } while (--len);
   DRQ_Port->ODR = DRQ_Port->ODR & ~DRQ_Pin; //DRQ = 0;
   __enable_irq();
-  LedOff(); //LED = 0;
   return 0;
 }
 #endif

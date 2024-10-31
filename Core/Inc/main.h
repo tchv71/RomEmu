@@ -31,7 +31,7 @@ extern "C" {
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "../../RkSd/common.h"
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/
@@ -155,6 +155,7 @@ static inline uint32_t READ_ADDR()
   uint32_t addr = (pb & 0b11000000) | ((pb & 1) << 1) | ((pa & 0b10000000) >> 7) | ((pa & 0b11110) << 1);
   return addr;
 }
+
 
 /* USER CODE END Private defines */
 

@@ -1,4 +1,4 @@
-﻿/*
+/*
  It is an open source software to implement SD routines to
  small embedded systems. This is a free software and is opened for education,
  research and commercial developments under license policy of following trems.

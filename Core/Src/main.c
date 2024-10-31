@@ -362,8 +362,8 @@ static void MX_RTC_Init(void)
 
   /* USER CODE END RTC_Init 0 */
 
-  RTC_TimeTypeDef sTime = {0};
-  RTC_DateTypeDef sDate = {0};
+  //RTC_TimeTypeDef sTime = {0};
+  //RTC_DateTypeDef sDate = {0};
 
   /* USER CODE BEGIN RTC_Init 1 */
 
@@ -382,6 +382,7 @@ static void MX_RTC_Init(void)
   {
     Error_Handler();
   }
+  HAL_RTCEx_SetSmoothCalib(&hrtc, RTC_SMOOTHCALIB_PERIOD_32SEC, RTC_SMOOTHCALIB_PLUSPULSES_SET, 273);
 
   /* USER CODE BEGIN Check_RTC_BKUP */
 
@@ -474,8 +475,8 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(LED13_GPIO_Port, LED13_Pin, GPIO_PIN_SET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, D2_Pin|D3_Pin|D4_Pin|D5_Pin
-                          |D6_Pin|D7_Pin|D0_Pin|D1_Pin, GPIO_PIN_RESET);
+//  HAL_GPIO_WritePin(GPIOB, D2_Pin|D3_Pin|D4_Pin|D5_Pin
+//                          |D6_Pin|D7_Pin|D0_Pin|D1_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOA, SD_CS_Pin|RXRDY_Pin|TXRDY_Pin, GPIO_PIN_SET);
@@ -511,7 +512,7 @@ static void MX_GPIO_Init(void)
                            D6_Pin D7_Pin D0_Pin D1_Pin */
   GPIO_InitStruct.Pin = D2_Pin|D3_Pin|D4_Pin|D5_Pin
                           |D6_Pin|D7_Pin|D0_Pin|D1_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
@@ -535,6 +536,14 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+#ifdef USE_DMA
+  GPIO_InitStruct.Pin = A2_Pin; //DRQ_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+  HAL_GPIO_Init (A2_GPIO_Port, &GPIO_InitStruct);
+#endif
 
 /* USER CODE BEGIN MX_GPIO_Init_2 */
 /* USER CODE END MX_GPIO_Init_2 */

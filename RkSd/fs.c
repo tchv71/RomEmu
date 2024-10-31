@@ -711,7 +711,7 @@ static CONST BYTE * fs_open0_name(CONST BYTE *p) {
 
 static BYTE fs_open0_create(BYTE dir) {
   BYTE  new_name[11];
-  DWORD allocatedCluster;     
+  DWORD allocatedCluster=0;
   BYTE* allocatedEntry;
 
   /* Сохраняем имя, так как весь буфер будет затерт */

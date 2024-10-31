@@ -118,7 +118,7 @@ BYTE fs_getfree();                               /* Свободное мест�
 * Или смотри исходники fs_write
 */
 
-#define fs_file_wlen   (*(WORD*)&fs_tmp)
+#define fs_file_wlen   (*(WORD*)(&fs_tmp))
 #define fs_file_woff   ((WORD*)&fs_tmp)[1]
 #define fs_file_wbuf   (buf + fs_file_woff)
 

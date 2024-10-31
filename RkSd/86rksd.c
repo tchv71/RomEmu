@@ -3,8 +3,6 @@
 
 //#include <stdafx.h>
 
-#define F_CPU 8000000UL        //freq 8 MHz
-
 #include "common.h"
 #include <string.h>
 #include "sd.h"
@@ -13,26 +11,22 @@
 #include "../Core/Inc/main.h"
 #include "stm32f4xx_hal_rtc.h"
 
-#ifndef X86_DEBUG
-//#include <delay.h>
-#endif
-
 #define O_OPEN   0
 #define O_CREATE 1
 #define O_MKDIR  2
 #define O_DELETE 100
 #define O_SWAP   101
 
-#define ERR_START       0x40
-#define ERR_WAIT        0x41
-#define ERR_OK_DISK         0x42
-#define ERR_OK_CMD          0x43
-#define ERR_OK_READ         0x44
-#define ERR_OK_ENTRY        0x45
-#define ERR_OK_WRITE        0x46
-#define ERR_OK_RKS          0x47
-#define ERR_DATETIME        0x50
-#define ERR_READ_BLOCK      0x4F
+#define STA_START       0x40
+#define STA_WAIT        0x41
+#define STA_OK_DISK     0x42
+#define STA_OK_CMD      0x43
+#define STA_OK_READ     0x44
+#define STA_OK_ENTRY    0x45
+#define STA_OK_WRITE    0x46
+#define STA_OK_RKS      0x47
+#define ERR_DATETIME    0x50
+#define STA_OK_BLOCK    0x4F
 
 BYTE buf[512];
 BYTE rom[128];
@@ -117,9 +111,9 @@ void readInt(char rks)
       buf[3] = tmp;
 
       // Посылаем адрес загрузки
-      send (ERR_OK_RKS);
+      send (STA_OK_RKS);
       sendBin (buf, 2);
-      send (ERR_WAIT);
+      //send (ERR_WAIT);
 
       // Корректируем указатели
       wptr += 4;
@@ -142,15 +136,20 @@ void readInt(char rks)
     }
 
     // Отправляем блок
-    send (ERR_READ_BLOCK);
+    send (STA_OK_BLOCK);
     sendBin ((BYTE*) &readedLength, 2);
+#ifdef USE_DMA
+    sendFlush();
+    dma_send(wptr, readedLength); //
+#else
     sendBin (wptr, readedLength);
-    send (ERR_WAIT);
+#endif
+    //send (ERR_WAIT);
   }
 
   // Если все ОК
   if (!lastError)
-    lastError = ERR_OK_READ;
+    lastError = STA_OK_READ;
 }
 
 /*******************************************************************************
@@ -162,8 +161,13 @@ void cmd_ver()
   sendStart (1);
 
   // Версия + Производитель
-  sendBinf ((const unsigned char*) "V1.0 10-05-2014 ", 16);
-  //0123456789ABCDEF
+  {
+    const unsigned char * ver = (const unsigned char*)"V1.0 10-05-2014 ";
+    sendBinf (ver, 16);
+  }
+#ifdef USE_DMA
+  sendFlush();
+#endif
 }
 
 /*******************************************************************************
@@ -173,8 +177,13 @@ void cmd_ver()
 void cmd_boot_exec()
 {
   // Файл по умолчанию
-  if (buf[0] == 0)
-    strcpy ((char*) buf, (const char*) (nCS_GPIO_Port->IDR & nCS_Pin)? "boota/sdbios.rk" : "boot/sdbios.rk");
+#ifndef USE_DMA
+    const char *bootSdbiosRk = "boot/sdbios.rk";
+#else
+    const char *bootSdbiosRk = "boot/sdbiosd.rkl";
+#endif
+    if (buf[0] == 0)
+      strcpy((char*) buf, (const char*) (nCS_GPIO_Port->IDR & nCS_Pin) ?  "boota/sdbios.rk" : bootSdbiosRk);
 
   // Открываем файл
   if (fs_open ())
@@ -197,7 +206,7 @@ void cmd_boot_exec()
 
 void cmd_boot()
 {
-  sendStart (ERR_WAIT);
+  sendStart (STA_WAIT);
   buf[0] = 0;
   cmd_boot_exec ();
 }
@@ -207,10 +216,10 @@ void cmd_exec()
   // Прием имени файла
   recvString ();
 
-  if ((nCS_GPIO_Port->IDR & nCS_Pin) && stricmp(buf, "BOOT/SHELL.RK") == 0)
-    strcpy(buf, "BOOTA/SHELL.RK");
+  if ((nCS_GPIO_Port->IDR & nCS_Pin) && stricmp((char*)buf, "BOOT/SHELL.RK") == 0)
+    strcpy((char*)buf, "BOOTA/SHELL.RK");
   // Режим передачи и подтверждение
-  sendStart (ERR_WAIT);
+  sendStart (STA_WAIT);
   if (lastError)
     return; // Переполнение строки
 
@@ -218,7 +227,7 @@ void cmd_exec()
 }
 
 /*******************************************************************************
- * Начать/продолжить посик файлов в папке                                       *
+ * Начать/продолжить поиск файлов в папке                                       *
  *******************************************************************************/
 
 typedef struct
@@ -239,7 +248,7 @@ typedef struct
 
 void cmd_find()
 {
-  WORD n;
+  WORD n = 0;
   FILINFO2 info;
 
   // Принимаем путь
@@ -249,7 +258,7 @@ void cmd_find()
   recvBin ((BYTE*) &n, 2);
 
   // Режим передачи и подтверждение
-  sendStart (ERR_WAIT);
+  sendStart (STA_WAIT);
   if (lastError)
     return;
 
@@ -269,7 +278,7 @@ void cmd_find()
     /* Конец */
     if (FS_DIRENTRY[0] == 0)
     {
-      lastError = ERR_OK_CMD;
+      lastError = STA_OK_CMD;
       return;
     }
 
@@ -280,9 +289,14 @@ void cmd_find()
     //memcpy(memcpy(memcpy(info.fname, FS_DIRENTRY+DIR_Name, 12, FS_DIRENTRY+DIR_FileSize, 4), FS_DIRENTRY+DIR_WrtTime, 4);
 
     /* Отправляем */
-    send (ERR_OK_ENTRY);
-    sendBin ((BYTE*) &info, sizeof(info));
-    send (ERR_WAIT);
+    send (STA_OK_ENTRY);
+    #ifndef USE_DMA
+      sendBin ((BYTE*) &info, sizeof(info));
+    #else
+      sendFlush();
+      dma_send((BYTE*) &info, sizeof(info));
+    #endif
+    //send (ERR_WAIT);
   }
 
   /* Ограничение по размеру */
@@ -304,7 +318,7 @@ void cmd_open()
   recvString ();
 
   // Режим передачи и подтверждение
-  sendStart (ERR_WAIT);
+  sendStart (STA_WAIT);
 
   // Открываем/создаем файл/папку
   if (mode == O_SWAP)
@@ -330,7 +344,7 @@ void cmd_open()
 
   // Ок
   if (!lastError)
-    lastError = ERR_OK_CMD;
+    lastError = STA_OK_CMD;
 }
 
 /*******************************************************************************
@@ -340,16 +354,16 @@ void cmd_open()
 void cmd_move()
 {
   recvString ();
-  sendStart (ERR_WAIT);
+  sendStart (STA_WAIT);
   fs_openany();
-  sendStart (ERR_OK_WRITE);
+  sendStart (STA_OK_WRITE);
   recvStart ();
   recvString ();
-  sendStart (ERR_WAIT);
+  sendStart (STA_WAIT);
   if (!lastError)
     fs_move0 ();
   if (!lastError)
-    lastError = ERR_OK_CMD;
+    lastError = STA_OK_CMD;
 }
 
 /*******************************************************************************
@@ -366,7 +380,7 @@ void cmd_lseek()
   recvBin ((BYTE*) &off, 4);
 
   // Режим передачи и подтверждение
-  sendStart (ERR_WAIT);
+  sendStart (STA_WAIT);
 
   // Размер файла
   if (mode == 100)
@@ -397,7 +411,7 @@ void cmd_lseek()
   }
 
   // Передаем результат
-  send (ERR_OK_CMD);
+  send (STA_OK_CMD);
   sendBin ((BYTE*) &fs_tmp, 4);
   lastError = 0; // На всякий случай, результат уже передан
 }
@@ -408,7 +422,7 @@ void cmd_lseek()
 extern RTC_HandleTypeDef hrtc;
 void cmd_get_date()
 {
-  sendStart(ERR_WAIT);
+  sendStart(STA_WAIT);
   RTC_DateTypeDef sDate={0};
   if (HAL_RTC_GetDate(&hrtc, &sDate, RTC_FORMAT_BIN)!= HAL_OK)
   {
@@ -416,7 +430,7 @@ void cmd_get_date()
     return;
   }
   sendBin((BYTE*)&sDate, sizeof(sDate));
-  send (ERR_OK_CMD);
+  send (STA_OK_CMD);
   //lastError = ERR_OK_CMD;
 }
 
@@ -443,14 +457,14 @@ void cmd_set_date()
   sDate.Year = wrecv();
   sDate.WeekDay = Calendar_GetDayWeek(sDate);
   // Режим передачи и подтверждение
-  sendStart (ERR_WAIT);
+  sendStart (STA_WAIT);
 
   if (HAL_RTC_SetDate(&hrtc, &sDate, RTC_FORMAT_BIN)!= HAL_OK)
   {
     lastError = ERR_DATETIME;
     return;
   }
-  send (ERR_OK_CMD);
+  send (STA_OK_CMD);
   //lastError = ERR_OK_CMD;
 }
 
@@ -459,7 +473,7 @@ void cmd_set_date()
  *******************************************************************************/
 void cmd_get_time()
 {
-  sendStart(ERR_WAIT);
+  sendStart(STA_WAIT);
   RTC_TimeTypeDef sTime={0};
 
   if (HAL_RTC_GetTime(&hrtc, &sTime, RTC_FORMAT_BIN)!= HAL_OK)
@@ -476,8 +490,8 @@ void cmd_get_time()
   sendBin((BYTE*)&sTime, 3);
   sendBin((BYTE*)&sTime.SecondFraction,1);
   sendBin((BYTE*)&sTime.SubSeconds,1);
-  send (ERR_OK_CMD);
-  lastError = ERR_OK_CMD;
+  send (STA_OK_CMD);
+  lastError = STA_OK_CMD;
 }
 
 /*******************************************************************************
@@ -502,8 +516,8 @@ void cmd_set_time()
     lastError = ERR_DATETIME;
     return;
   }
-  send (ERR_OK_CMD);
-  lastError = ERR_OK_CMD;
+  send (STA_OK_CMD);
+  lastError = STA_OK_CMD;
 }
 
 /*******************************************************************************
@@ -518,7 +532,7 @@ void cmd_read()
   recvBin ((BYTE*) &readLength, 2);
 
   // Режим передачи и подтверждение
-  sendStart (ERR_WAIT);
+  sendStart (STA_WAIT);
 
   // Ограничиваем длину длиной файла
   if (fs_getfilesize ())
@@ -545,13 +559,13 @@ void cmd_write()
   recvBin ((BYTE*) &fs_wtotal, 2);
 
   // Ответ
-  sendStart (ERR_WAIT);
+  sendStart (STA_WAIT);
 
   // Конец файла
   if (fs_wtotal == 0)
   {
     fs_write_eof ();
-    lastError = ERR_OK_CMD;
+    lastError = STA_OK_CMD;
     return;
   }
 
@@ -562,18 +576,22 @@ void cmd_write()
       return;
 
     // Принимаем от компьютера блок данных
-    send (ERR_OK_WRITE);
+    send (STA_OK_WRITE);
     sendBin ((BYTE*) &fs_file_wlen, 2);
-    recvStart ();
-    recvBin (fs_file_wbuf, fs_file_wlen);
-    sendStart (ERR_WAIT);
+    recvStartNoDma ();
+    #ifndef USE_DMA
+      recvBin (fs_file_wbuf, fs_file_wlen);
+    #else
+      dma_receive(fs_file_wbuf, fs_file_wlen);
+    #endif
+    sendStart (STA_WAIT);
 
     if (fs_write_end ())
       return;
   }
   while (fs_wtotal);
 
-  lastError = ERR_OK_CMD;
+  lastError = STA_OK_CMD;
 }
 
 /*******************************************************************************
@@ -609,15 +627,15 @@ BYTE RkSd_Loop()
     LedOn ();
 
     // Проверяем наличие карты
-    sendStart (ERR_START);
-    send (ERR_WAIT);
+    sendStart (STA_START);
+    //send (ERR_WAIT);
     //if (fs_check ())
     //{
     //  send (ERR_DISK_ERR);
     //}
     //else
     {
-      send (ERR_OK_DISK);
+      send (STA_OK_DISK);
       recvStart ();
       c = wrecv ();
 
@@ -676,11 +694,16 @@ BYTE RkSd_Loop()
       // Вывод ошибки
       if (lastError)
 	sendStart (lastError);
+      #ifdef USE_DMA
+	sendFlush();
+      #endif
     }
 
-    // Порт работает на выход
-    wait ();
-    DATA_OUT
+    #ifndef USE_DMA
+      // Порт работает на выход
+      wait ();
+      DATA_OUT();
+    #endif
 
     // Гасим светодиод
     LedOff ();
@@ -688,10 +711,55 @@ BYTE RkSd_Loop()
   }
 }
 
+#ifdef USE_DMA
+
+
+BYTE dma_send(const BYTE* ptr, WORD len)
+{
+  DATA_IN();
+  DRQ_Port->ODR = DRQ_Port->ODR | DRQ_Pin; //DRQ = 1;
+  LedOn();//LED = 1;
+  WORD count = len;
+  __disable_irq();
+  do
+  {
+    while (nIOR_Port->IDR & (nIOR_Pin | nDACK_Pin)) ;
+    DATA_OUT();
+    WRITE_DATA(*ptr++); //PORTD = *ptr++;
+    while ((nIOR_Port->IDR & nIOR_Pin) == 0) ;
+    DATA_IN();
+  } while (--count);
+  DRQ_Port->ODR = DRQ_Port->ODR & ~DRQ_Pin; //DRQ = 0;
+  __enable_irq();
+  LedOff(); //LED = 0;
+  return 0;
+}
+
+BYTE dma_receive(BYTE* ptr, WORD len)
+{
+  DATA_IN();
+  DRQ_Port->ODR = DRQ_Port->ODR | DRQ_Pin; //DRQ = 1;
+  LedOn();//LED = 1;
+  __disable_irq();
+  do
+  {
+    while (nIOW_Port->IDR & (nIOW_Pin | nDACK_Pin)) ;
+    while ((nIOR_Port->IDR & nIOW_Pin) == 0) ;
+    *ptr++ = READ_DATA();
+  } while (--len);
+  DRQ_Port->ODR = DRQ_Port->ODR & ~DRQ_Pin; //DRQ = 0;
+  __enable_irq();
+  LedOff(); //LED = 0;
+  return 0;
+}
+#endif
+
 void RkSd_main()
 {
 
-  DATA_OUT
+#ifndef USE_DMA
+  DATA_OUT();
+#endif
   // Шина данных (DDRD)
   //DDRC = 0b00000000; // Шина адреса
   //DDRB = 0b00101101; // Шина адреса, карта и светодиод
@@ -715,49 +783,60 @@ void RkSd_main()
     error ();
   if (fs_tmp > 128)
     error ();
-  if (fs_read0 (rom, (WORD) fs_tmp))
+  WORD rom_size = (WORD)fs_tmp;
+  if (fs_read0 (rom, rom_size))
     error ();
 
   HAL_Delay (100);
 
   // Гасим светодиод
   LedOff ();
+#if 0 //def USE_DMA
+  dma_send(rom, rom_size);
+  dma_receive(buf, rom_size);
+  int n = memcmp(buf, rom, rom_size);
+  GPIOB->ODR = n;
+  while(1) ;
+#endif
   while (1)
   {
     // Эмуляция ПЗУ
 
-    BYTE lastAddr = 0;
 
-    while (1)
-    {
-      static uint32_t oldAddr = -1;
-      uint32_t addr = READ_ADDR();
-      if (oldAddr != addr)
+
+    #ifndef USE_DMA
+      BYTE lastAddr = 0;
+      while (1)
       {
-	uint32_t val = rom[addr & 0x7f];
-	WRITE_DATA(val);
-	oldAddr = addr;
-	if (addr == 0x44)
+	static uint32_t oldAddr = -1;
+	uint32_t addr = READ_ADDR();
+	if (oldAddr != addr)
 	{
-	  lastAddr = 0x44;
+	  uint32_t val = rom[addr & 0x7f];
+	  WRITE_DATA(val);
+	  oldAddr = addr;
+	  if (addr == 0x44)
+	  {
+	    lastAddr = 0x44;
+	  }
+	  else if (addr == 0x40)
+	  {
+	    if (lastAddr == 0x44)
+	      lastAddr = 0x40;
+	    else
+	      lastAddr = 0;
+	  }
+	  else if (addr == 0)
+	  {
+	    if (lastAddr == 0x40)
+	      break;
+	    else
+	      lastAddr = 0;
+	  }
 	}
-	else if (addr == 0x40)
-	{
-	  if (lastAddr == 0x44)
-	    lastAddr = 0x40;
-	  else
-	    lastAddr = 0;
-	}
-	else if (addr == 0)
-	{
-	  if (lastAddr == 0x40)
-	    break;
-	  else
-	    lastAddr = 0;
-	}
-      }
 
-    }
+      }
+    #endif
     if (!RkSd_Loop())
       return;
   }
